@@ -253,7 +253,18 @@ function readLicenseFiles(directory) {
 
 function overrideLicenseText(packageKey, selectedLicense) {
   if (selectedLicense === 'Apache-2.0' && APACHE_TEXT_OVERRIDE_KEYS.has(packageKey)) {
-    return normalizeText(readFileSync(join(repoRoot, 'LICENSE'), 'utf8'));
+    // Only the license text itself stands in for the package's missing copy.
+    // LICENSE also carries Maka's own third-party section, and letting that
+    // through would file every entry in it under this one package. `split`
+    // returns the whole string when the delimiter is absent, which would
+    // reinstate exactly that bug, so the delimiter is required rather than
+    // assumed.
+    const rootLicense = readFileSync(join(repoRoot, 'LICENSE'), 'utf8');
+    const [apacheText, thirdParty] = rootLicense.split('\nTHIRD-PARTY COMPONENTS\n');
+    if (thirdParty === undefined) {
+      throw new Error('LICENSE has no THIRD-PARTY COMPONENTS section header to truncate at');
+    }
+    return normalizeText(apacheText);
   }
   const copyrightNotice = MIT_COPYRIGHT_OVERRIDES.get(packageKey);
   if (selectedLicense === 'MIT' && copyrightNotice) return MIT_TEXT(copyrightNotice);
